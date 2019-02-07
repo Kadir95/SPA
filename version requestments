@@ -1,0 +1,9 @@
+## Version 1
+- Split the pdf file into students parts (use the e-mail as file name but it will be changeable, if there is no such e-mail in db then recommend e-mails according to similarities)
+- There are templates for the quiz or exam. The temple can be created or selected from existed.
+- CNN number recognition
+- G-drive integration
+- grade objection
+
+ ## Version 2
+ - QR
