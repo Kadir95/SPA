@@ -1,0 +1,10 @@
+INSERT INTO spadb.people(
+	password, name, lastname, school_no)
+	VALUES (encode(sha256('password'), 'base64'), '_name', '_lastname', 41501017);
+
+SELECT * FROM spadb.people
+
+DELETE FROM spadb.people WHERE TRUE
+
+ALTER TABLE spadb.people
+    ALTER COLUMN password TYPE bytea COLLATE pg_catalog."default";

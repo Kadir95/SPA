@@ -19,4 +19,16 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<role name="spa"/>
 </schema>
 
+<table name="people" layer="0" collapse-mode="2" max-obj-count="1">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="920" y="474"/>
+	<column name="id" not-null="true">
+		<type name="bigserial" length="0"/>
+	</column>
+	<constraint name="people_pk" type="pk-constr" table="public.people">
+		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+</table>
+
 </dbmodel>
