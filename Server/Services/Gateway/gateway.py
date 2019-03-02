@@ -1,9 +1,10 @@
 import falcon
 import rpyc
 import json
+import sys
 
-def connect_rpc():
-    return rpyc.connect("localhost", 7878)
+sys.path.append("../../Lib")
+from connections import connect_rpc, services
 
 class auth_router:
     def on_get(self, req, resp):
@@ -51,7 +52,30 @@ def try_token_handler(req, resp):
         response = conn.root.verify_token(req.get_header("token"))
         resp.media = json.loads(response)
 
+def user_handler(req, resp):
+    conn = connect_rpc(service= services["user_service"])
+    resp.media = json.loads(conn.root.echo(req.get_header("text")))
+
+def user_type(req, resp):
+    user_service = connect_rpc(service=services["user_service"])
+    auth_service = connect_rpc()
+
+    if req.get_header("email") is not None and req.get_header("token") is not None:
+        data = {
+            "email": req.get_header("email"),
+            "token": req.get_header("token")
+        }
+        
+        resp.media = json.loads(user_service.root.create_instructor(data))
+    else:
+        resp.media = {
+            "success": False,
+            "message": "token and email should be mentioned"
+        }
+
 api = falcon.API()
 api.add_route("/api/auth", auth_router())
 api.add_sink(sign_handler, "/api/sign_in")
 api.add_sink(try_token_handler, "/api/try_token")
+api.add_sink(user_handler, "/api/user")
+api.add_sink(user_type, "/api/user/type")
