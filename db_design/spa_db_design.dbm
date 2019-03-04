@@ -3,7 +3,7 @@
 CAUTION: Do not modify this file unless you know what you are doing.
          Unexpected results may occur if the code is changed deliberately.
 -->
-<dbmodel pgmodeler-ver="0.9.2-alpha1" last-position="0,0" last-zoom="1" max-obj-count="10"
+<dbmodel pgmodeler-ver="0.9.2-alpha1" last-position="0,0" last-zoom="1" max-obj-count="16"
 	 default-schema="public" default-owner="postgres">
 <role name="spa"
       superuser="true">
@@ -65,6 +65,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<constraint name="universities_pk" type="pk-constr" table="public.universities">
 		<columns names="university_id" ref-type="src-columns"/>
 	</constraint>
+	<constraint name="uniqness" type="uq-constr" table="public.universities">
+		<columns names="name,s_name" ref-type="src-columns"/>
+	</constraint>
 </table>
 
 <relationship name="many_people_has_many_universities" type="relnn" layer="0"
@@ -82,7 +85,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</label>
 </relationship>
 
-<table name="courses" layer="0" collapse-mode="2" max-obj-count="3">
+<table name="courses" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="40" y="340"/>
@@ -98,27 +101,17 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<constraint name="courses_pk" type="pk-constr" table="public.courses">
 		<columns names="course_id" ref-type="src-columns"/>
 	</constraint>
+
+	<customidxs object-type="column">
+		<object name="department_id_departments" index="3"/>
+	</customidxs>
+
+	<customidxs object-type="constraint">
+		<object name="departments_fk" index="1"/>
+	</customidxs>
 </table>
 
-<relationship name="many_courses_has_many_universities" type="relnn" layer="0"
-	 src-col-pattern="{sc}_{st}" dst-col-pattern="{sc}_{dt}"
-	 pk-pattern="{gt}_pk" uq-pattern="{gt}_uq"
-	 src-fk-pattern="{st}_fk" dst-fk-pattern="{dt}_fk"
-	 pk-col-pattern="id"
-	 custom-color="#81a6d1"
-	 src-table="public.courses"
-	 dst-table="public.universities"
-	 src-required="false" dst-required="false"
-	 table-name="many_courses_has_many_universities">
-	<column name="faculty" not-null="true">
-		<type name="character varying" length="128"/>
-	</column>
-	<column name="department" not-null="true">
-		<type name="character varying" length="128"/>
-	</column>
-</relationship>
-
-<table name="instructors" layer="0" collapse-mode="2" max-obj-count="3">
+<table name="instructors" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="1060" y="180"/>
@@ -148,10 +141,10 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 dst-table="public.instructors"
 	 src-required="false" dst-required="false"/>
 
-<table name="students" layer="0" collapse-mode="2" max-obj-count="3">
+<table name="students" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="1060" y="340"/>
+	<position x="1060" y="400"/>
 	<column name="student_id" not-null="true">
 		<type name="bigserial" length="0"/>
 	</column>
@@ -181,7 +174,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="sections" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="540" y="400"/>
+	<position x="540" y="700"/>
 	<column name="section_id" not-null="true">
 		<type name="bigserial" length="0"/>
 	</column>
@@ -236,15 +229,18 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 src-required="false" dst-required="false"
 	 table-name="many_students_has_many_sections"/>
 
-<table name="exam" layer="0" collapse-mode="2" max-obj-count="2">
+<table name="exam" layer="0" collapse-mode="2" max-obj-count="3">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="1060" y="500"/>
+	<position x="1060" y="700"/>
 	<column name="exam_id" not-null="true">
 		<type name="bigserial" length="0"/>
 	</column>
 	<column name="type" not-null="true">
 		<type name="character varying" length="5"/>
+	</column>
+	<column name="questions">
+		<type name="bytea" length="0" dimension="1"/>
 	</column>
 	<constraint name="exam_pk" type="pk-constr" table="public.exam">
 		<columns names="exam_id" ref-type="src-columns"/>
@@ -281,6 +277,139 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 custom-color="#4cddcd"
 	 src-table="public.people"
 	 dst-table="public.admins"
+	 src-required="false" dst-required="false">
+	<label ref-type="name-label">
+		<position x="0" y="0"/>
+	</label>
+</relationship>
+
+<table name="faculties" layer="0" collapse-mode="2" max-obj-count="3">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="540" y="260"/>
+	<column name="faculty_id" not-null="true">
+		<type name="bigserial" length="0"/>
+	</column>
+	<column name="name" not-null="true">
+		<type name="character varying" length="128"/>
+	</column>
+	<constraint name="faculties_pk" type="pk-constr" table="public.faculties">
+		<columns names="faculty_id" ref-type="src-columns"/>
+	</constraint>
+
+	<customidxs object-type="column">
+		<object name="university_id_universities" index="2"/>
+	</customidxs>
+
+	<customidxs object-type="constraint">
+		<object name="universities_fk" index="1"/>
+	</customidxs>
+</table>
+
+<relationship name="universities_has_many_faculties" type="rel1n" layer="0"
+	 src-col-pattern="{sc}_{st}"
+	 pk-pattern="{dt}_pk" uq-pattern="{dt}_uq"
+	 src-fk-pattern="{st}_fk"
+	 custom-color="#a980b1"
+	 src-table="public.universities"
+	 dst-table="public.faculties"
 	 src-required="false" dst-required="false"/>
+
+<table name="departments" layer="0" collapse-mode="2" max-obj-count="3">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="540" y="480"/>
+	<column name="department_id" not-null="true">
+		<type name="bigserial" length="0"/>
+	</column>
+	<column name="name" not-null="true">
+		<type name="character varying" length="128"/>
+	</column>
+	<constraint name="departments_pk" type="pk-constr" table="public.departments">
+		<columns names="department_id" ref-type="src-columns"/>
+	</constraint>
+
+	<customidxs object-type="column">
+		<object name="faculty_id_faculties" index="2"/>
+	</customidxs>
+
+	<customidxs object-type="constraint">
+		<object name="faculties_fk" index="1"/>
+	</customidxs>
+</table>
+
+<relationship name="faculties_has_many_departments" type="rel1n" layer="0"
+	 src-col-pattern="{sc}_{st}"
+	 pk-pattern="{dt}_pk" uq-pattern="{dt}_uq"
+	 src-fk-pattern="{st}_fk"
+	 custom-color="#f55a7b"
+	 src-table="public.faculties"
+	 dst-table="public.departments"
+	 src-required="false" dst-required="false">
+	<label ref-type="name-label">
+		<position x="4.41412" y="-24.6857"/>
+	</label>
+</relationship>
+
+<relationship name="departments_has_many_students" type="rel1n" layer="0"
+	 src-col-pattern="{sc}_{st}"
+	 pk-pattern="{dt}_pk" uq-pattern="{dt}_uq"
+	 src-fk-pattern="{st}_fk"
+	 custom-color="#0664c5"
+	 src-table="public.departments"
+	 dst-table="public.students"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="departments_has_many_instructors" type="rel1n" layer="0"
+	 src-col-pattern="{sc}_{st}"
+	 pk-pattern="{dt}_pk" uq-pattern="{dt}_uq"
+	 src-fk-pattern="{st}_fk"
+	 custom-color="#81d91f"
+	 src-table="public.departments"
+	 dst-table="public.instructors"
+	 src-required="false" dst-required="false">
+	<label ref-type="name-label">
+		<position x="8.85284" y="47.0123"/>
+	</label>
+</relationship>
+
+<relationship name="departments_has_many_courses" type="rel1n" layer="0"
+	 src-col-pattern="{sc}_{st}"
+	 pk-pattern="{dt}_pk" uq-pattern="{dt}_uq"
+	 src-fk-pattern="{st}_fk"
+	 custom-color="#91d0c4"
+	 src-table="public.departments"
+	 dst-table="public.courses"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="many_students_has_many_exam" type="relnn" layer="0"
+	 src-col-pattern="{sc}_{st}" dst-col-pattern="{sc}_{dt}"
+	 pk-pattern="{gt}_pk" uq-pattern="{gt}_uq"
+	 src-fk-pattern="{st}_fk" dst-fk-pattern="{dt}_fk"
+	 pk-col-pattern="id"
+	 custom-color="#799812"
+	 src-table="public.students"
+	 dst-table="public.exam"
+	 src-required="false" dst-required="false"
+	 table-name="many_students_has_many_exam">
+	<column name="questions">
+		<type name="bytea" length="0" dimension="1"/>
+	</column>
+	<column name="grade">
+		<type name="float" length="0"/>
+	</column>
+</relationship>
+
+<constraint name="course_uniqness" type="uq-constr" table="public.courses">
+	<columns names="name,department_id_departments,course_code" ref-type="src-columns"/>
+</constraint>
+
+<constraint name="department_uniqness" type="uq-constr" table="public.departments">
+	<columns names="name,faculty_id_faculties" ref-type="src-columns"/>
+</constraint>
+
+<constraint name="faculty_uniqness" type="uq-constr" table="public.faculties">
+	<columns names="name,university_id_universities" ref-type="src-columns"/>
+</constraint>
 
 </dbmodel>

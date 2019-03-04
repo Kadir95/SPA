@@ -9,6 +9,7 @@ from rpyc.utils.server import ThreadedServer
 
 sys.path.append("../../Lib")
 from connections import connect_rpc, services, connect_db
+from token_operations import verify_token
 
 conn = connect_db()
 
@@ -93,44 +94,35 @@ class Auth_service(rpyc.Service):
     def exposed_user_type(self, email):
         if email is not None:
             cur = conn.cursor()
-            cur.execute("select A.admin_id from public.people as P left join public.admins as A on P.id = A.admin_id where P.email = %s;", [email])
+            cur.execute("""select P.id, A.admin_id, I.instructor_id, S.student_id from ((
+                            (public.people as P left join public.admins as A on P.id = A.admin_id)
+                            left join public.instructors as I on P.id = I.instructor_id) 
+                            left join public.students as S on P.id = S.student_id)
+                            where P.email = %s;""", [email])
             rows = cur.fetchall()
             cur.close()
 
             response = []
             for row in rows:
                 response.append(row)
+            
+            if len(response) == 0:
+                return None    
             response = response[0]
 
-            if response[0] == None:
-                return "normal_user"
-            else:
+            if response[1] is not None:
                 return "admin_user"
+            elif response[2] is not None:
+                return "instructor_user"
+            elif response[3] is not None:
+                return "student_user"
+            else:
+                return "normal_user"
         else: 
             return None
         
     def exposed_verify_token(self, token):
-        try:
-            payload = jwt.decode(token, secret, algorithms="HS256")
-            return json.dumps({
-                "success": True,
-                "payload": payload
-            })
-        except jwt.ExpiredSignatureError as err:
-            return json.dumps({
-                "success": False,
-                "message": "expired token"
-            })
-        except jwt.DecodeError as err:
-            return json.dumps({
-                "success": False,
-                "message": "decode error"
-            })
-        # easter egg :)
-        return json.dumps({
-            "success": False,
-            "message": "python failed successfully!"
-        })
+        return json.dumps(verify_token(token))
 
 port = services["auth_service"]
 rypc_server = ThreadedServer(

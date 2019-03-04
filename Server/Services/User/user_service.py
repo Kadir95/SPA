@@ -19,6 +19,34 @@ class User_service(rpyc.Service):
     def exposed_echo(self, text):
         return json.dumps({"text": text})
     
+    def exposed_add_university(self, data):
+        conn = connect_db()
+        cur = conn.cursor()
+
+        email = data["email"]
+        auth_service = connect_rpc()
+        user_type = auth_service.root.user_type(email)
+
+        if user_type and user_type == "admin_user":
+            try:
+                cur.execute("INSERT INTO public.universities(name, s_name) VALUES (%s, %s);", [data["university_name"], data["university_sname"]])
+                conn.commit()
+
+                return json.dumps({
+                    "success": True,
+                    "message": "<%s, %s> added successfully" %(data["university_name"], data["university_sname"])
+                })
+            except Exception as err:
+                return json.dumps({
+                    "success": False,
+                    "message": "task failed"
+                })
+        else:
+            return json.dumps({
+                "success": False,
+                "message": "Unauthorized user. User type: %s" %(user_type)
+            })
+
     def exposed_create_instructor(self, data):
         auth_service = connect_rpc()
 
@@ -33,7 +61,7 @@ class User_service(rpyc.Service):
             user_type = auth_service.root.user_type(token_payload["email"])
             if user_type is not None and user_type == "admin_user":
                 response = db_operations.get_user_row(["id"], email)
-                response = response[0]
+                response = response[0] if len(response) > 0 else response
                 if len(response) == 0:
                     return json.dumps({
                         "success": False,
@@ -64,7 +92,11 @@ class User_service(rpyc.Service):
                     "message": "Permission denied"
                 })
         else:
-            return token_verification_json
+            return json.dumps(token_verification_json)
+    
+    def exposed_create_course(self, data):
+        pass
+        
 
 port = services["user_service"]
 rypc_server = ThreadedServer(
