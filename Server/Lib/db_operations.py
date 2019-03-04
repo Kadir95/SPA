@@ -24,3 +24,15 @@ def get_user_row(column, email):
         response.append(temp)
 
     return response
+
+def get_exam_uuid(exam_id):
+    conn = connections.connect_db()
+    cur = conn.cursor()
+
+    cur.execute("select directory from public.exam where exam_id = %s", [exam_id])
+    rows = cur.fetchone()
+
+    if len(rows) == 0:
+        return None
+    
+    return rows[0]

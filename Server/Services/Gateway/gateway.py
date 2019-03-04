@@ -2,11 +2,15 @@ import falcon
 import rpyc
 import json
 import sys
+import os
+import uuid
 
 sys.path.append("../../Lib")
 from connections import connect_rpc, services
 from token_operations import verify_token
 from response_builder import std_response
+
+data_path = "/home/mzp7/workspace/MEF/SPA/Server/data"
 
 class AuthMiddleware(object):
     def __init__(self, exempt_routes=None, exempt_methods=None):
@@ -196,9 +200,69 @@ class create_router:
         response = user_service.root.create_handler(data)
         resp.media = json.loads(response)
 
+class upload_router:
+    def on_post(self, req, resp):
+        auth_service = connect_rpc()
+        user_type = auth_service.root.user_type(req.context["user"]["email"])
+
+        if user_type is None:
+            resp.media = std_response(False, message="No user")
+            return
+        
+        if user_type != "instructor_user":
+            resp.media = std_response(False, message="Unauthorized user")
+            return
+
+        if req.get_header("exam_id") is None:
+            resp.media = std_response(False, message="There is no exam_id")
+            return
+
+        data = {
+            "exam_id": req.get_header("exam_id")
+        }
+
+        file_service = connect_rpc(service=services["file_service"])
+        exam_uuid = file_service.root.exam_file(data)
+
+        if exam_uuid is None:
+            resp.media = std_response(False, message="Task failed")
+            return
+
+        file_dir = os.path.join(data_path, str(exam_uuid))
+        os.makedirs(file_dir)
+        file_dir = os.path.join(file_dir, "original_file")
+        file = open(file_dir, "wb")
+        file.write(req.stream.read())
+        file.close()
+
+        resp.media = std_response(True, message="File transferred successfully")
+    
+    def on_get(self, req, resp):
+        auth_service = connect_rpc()
+        user_type = auth_service.root.user_type(req.context["user"]["email"])
+
+        if user_type is None:
+            resp.media = std_response(False, message="No user")
+            return
+        
+        if user_type != "instructor_user":
+            resp.media = std_response(False, message="Unauthorized user")
+            return
+
+        if req.get_header("exam_id") is None:
+            resp.media = std_response(False, message="There is no exam_id")
+            return
+        
+        file_service = connect_rpc(service=services["file_service"])
+        exam_uuid = file_service.root.split_file(req.get_header("exam_id"))
+
+        resp.downloadable_as = 'attachment; filename="report.zip"'
+        resp.stream = open(os.path.join(data_path, exam_uuid, "result.zip"), "rb")
+
 api = falcon.API(middleware=[AuthMiddleware()])
 api.add_route("/api/assign", assign_router())
 api.add_route("/api/create", create_router())
+api.add_route("/api/upload", upload_router())
 
 api.add_route("/api/auth", auth_router())
 api.add_route("/api/sign_in", sign_handler())

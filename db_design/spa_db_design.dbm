@@ -227,9 +227,13 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 src-table="public.students"
 	 dst-table="public.sections"
 	 src-required="false" dst-required="false"
-	 table-name="many_students_has_many_sections"/>
+	 table-name="many_students_has_many_sections">
+	<label ref-type="name-label">
+		<position x="0" y="0"/>
+	</label>
+</relationship>
 
-<table name="exam" layer="0" collapse-mode="2" max-obj-count="3">
+<table name="exam" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="1060" y="700"/>
@@ -241,6 +245,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</column>
 	<column name="questions">
 		<type name="bytea" length="0" dimension="1"/>
+	</column>
+	<column name="directory">
+		<type name="uuid" length="0"/>
 	</column>
 	<constraint name="exam_pk" type="pk-constr" table="public.exam">
 		<columns names="exam_id" ref-type="src-columns"/>
