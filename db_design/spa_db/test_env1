@@ -1,0 +1,20 @@
+select * from public.people;
+select * from public.instructors;
+select * from public.admins;
+select * from public.universities;
+select * from public.faculties;
+select * from public.departments;
+select * from public.students;
+select * from public.courses;
+select * from public.sections;
+select * from public.exam;
+select * from public.many_exam_has_many_sections;
+
+select P.id, A.admin_id, I.instructor_id, S.student_id, P.email from ((
+	(public.people as P left join public.admins as A on P.id = A.admin_id)
+	left join public.instructors as I on P.id = I.instructor_id) 
+	left join public.students as S on P.id = S.student_id)
+
+INSERT INTO public.admins(admin_id, id_people)VALUES (2, 2);
+
+delete from public.exam 

@@ -6,6 +6,7 @@ import sys
 sys.path.append("../../Lib")
 from connections import connect_rpc, services
 from token_operations import verify_token
+from response_builder import std_response
 
 class AuthMiddleware(object):
     def __init__(self, exempt_routes=None, exempt_methods=None):
@@ -91,52 +92,114 @@ class try_token_handler:
         response = conn.root.verify_token(req.get_header("token"))
         resp.media = json.loads(response)
 
-class user_handler:
+class assign_router:
     def on_get(self, req, resp):
-        conn = connect_rpc(service= services["user_service"])
-        resp.media = json.loads(conn.root.echo(req.get_header("text")))
+        assign_as = req.params.get("assign_as")
 
-class user_type:
-    def on_get(self, req, resp):
-        user_service = connect_rpc(service=services["user_service"])
         auth_service = connect_rpc()
+        user_type = auth_service.root.user_type(req.context["user"]["email"])
 
-        if req.get_header("email") is not None and req.get_header("token") is not None:
-            data = {
-                "email": req.get_header("email"),
-                "token": req.get_header("token")
-            }
-            
-            resp.media = json.loads(user_service.root.create_instructor(data))
-        else:
+        if user_type is None:
             resp.media = {
                 "success": False,
-                "message": "token and email should be mentioned"
-            }
-
-class add_university:
-    def on_get(self, req, resp):
-        data = {
-            "email": req.context["user"]["email"],
-            "university_name": req.get_header("university_name"),
-            "university_sname": req.get_header("university_sname")
-        }
-
-        if data["university_name"] is None or data["university_sname"] is None:
-            resp.media = {
-                "success": False,
-                "message": "university_name or university_sname aren't mentioned"
+                "message": "No user"
             }
             return
         
-        user_service = connect_rpc(service=services["user_service"])
+        if user_type != "admin_user":
+            resp.media = {
+                "success": False,
+                "message": "Unauthorized user"
+            }
+            return
 
-        resp.media = json.loads(user_service.root.add_university(data))
+        op = ["instructor", "student", "admin"]
+
+        if assign_as not in op:
+            resp.media = {
+                "success": False,
+                "message": "assign as parameter could be %s" %(op)
+            }
+            return
+
+        if req.get_header("email") is None:
+            resp.media = {
+                "success": False,
+                "message": "email is needed"
+            }
+            return
+
+        if assign_as == "instructor" or assign_as == "student":
+            if req.get_header("department_id") is None:
+                resp.media = {
+                    "success": False,
+                    "message": "department_id is needed"
+                }
+                return
+
+        data = {
+            "op": assign_as,
+            "email": req.get_header("email"),
+            "department_id": req.get_header("department_id")
+        }
+
+        user_service = connect_rpc(service=services["user_service"])
+        response = user_service.root.assign_handler(data)
+        resp.media = json.loads(response)
+
+class create_router:
+    def on_get(self, req, resp):
+        admin_ops = ["university", "department", "faculty", "course"]
+        inst_ops = ["section", "exam"]
+
+        needed_args = {
+            "university": ["name", "s_name"],
+            "department": ["faculty_id", "name"],
+            "faculty": ["university_id", "name"],
+            "course": ["department_id", "name", "course_code"],
+            "section": ["course_id", "instructor_id", "section_code"],
+            "exam": ["section_ids", "type"]
+        }
+
+        op = req.params.get("new")
+
+        auth_service = connect_rpc()
+        user_type = auth_service.root.user_type(req.context["user"]["email"])
+
+        if user_type is None:
+            resp.media = std_response(False, message="No user")
+            return
+        
+        if op not in admin_ops + inst_ops:
+            resp.media = std_response(False, message="Unsupported operation")
+            return
+        
+        if op in admin_ops and user_type != "admin_user":
+            resp.media = std_response(False, message="Unauthorized user")
+            return
+
+        if op in inst_ops and user_type != "instructor_user" and user_type != "admin_user":
+            resp.media = std_response(False, message="Unauthorized user")
+            return
+        
+        data = {
+            "op": op
+        }
+
+        for needed_arg in needed_args[op]:
+            if req.get_header(needed_arg) is None:
+                resp.media = std_response(False, message="Insufficient arguments")
+                return
+            data[needed_arg] = req.get_header(needed_arg)
+
+        user_service = connect_rpc(service=services["user_service"])
+        response = user_service.root.create_handler(data)
+        resp.media = json.loads(response)
 
 api = falcon.API(middleware=[AuthMiddleware()])
+api.add_route("/api/assign", assign_router())
+api.add_route("/api/create", create_router())
+
 api.add_route("/api/auth", auth_router())
 api.add_route("/api/sign_in", sign_handler())
 api.add_route("/api/try_token", try_token_handler())
-api.add_route("/api/user", user_handler())
-api.add_route("/api/user/type", user_type())
-api.add_route("/api/user/add_university", add_university())
