@@ -9,11 +9,9 @@ from rpyc.utils.server import ThreadedServer
 
 sys.path.append("../../Lib")
 from connections import connect_rpc, services, connect_db
-from token_operations import verify_token
+from token_operations import verify_token, secret
 
 conn = connect_db()
-
-secret = "tikitikitemponeserambocarıbururucineserambo"
 
 class Auth_service(rpyc.Service):
     def _take_care_password(self, password, salt):
@@ -51,7 +49,6 @@ class Auth_service(rpyc.Service):
         })
         
     def exposed_get_token(self, data):
-        secret = "tikitikitemponeserambocarıbururucineserambo"
         cur = conn.cursor()
 
         email = data["email"]

@@ -1,6 +1,7 @@
+# -*- coding: utf-8 -*-
 import jwt
 
-secret = "tikitikitemponeserambocarıbururucineserambo"
+secret = "tikitikitemponeserambocaribururucineserambo"
 
 def verify_token(token):
     try:

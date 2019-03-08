@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from sys import exit
 from PyPDF2 import PdfFileReader, PdfFileWriter

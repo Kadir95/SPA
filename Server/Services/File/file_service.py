@@ -8,7 +8,7 @@ from rpyc.utils.server import ThreadedServer
 
 sys.path.append("../../Lib")
 from connections import connect_rpc, services, connect_db
-from token_operations import verify_token
+from token_operations import verify_token, secret
 from pdf_split import pdf_qrcode_reader, zip_results
 from db_operations import get_exam_uuid
 

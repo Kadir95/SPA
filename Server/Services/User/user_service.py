@@ -10,11 +10,10 @@ from rpyc.utils.server import ThreadedServer
 sys.path.append("../../Lib")
 from connections import connect_rpc, services, connect_db
 from response_builder import std_response
+from token_operations import secret
 import db_operations
 
 conn = connect_db()
-
-secret = "tikitikitemponeserambocarıbururucineserambo"
 
 class User_service(rpyc.Service):
     def exposed_assign_handler(self, data):

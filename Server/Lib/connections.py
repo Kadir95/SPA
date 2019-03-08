@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import rpyc
 import psycopg2 as postg
 from pymongo import MongoClient
@@ -12,7 +13,7 @@ def connect_rpc(service = services["auth_service"]):
     return rpyc.connect("localhost", service)
 
 def connect_db():
-    return postg.connect(database="new_database", user="postgres", password="333xwx333", host="172.17.0.3")
+    return postg.connect(database="new_database", user="postgres", password="333xwx333", host="172.17.0.2")
 
 def conncet_mongo():
     return MongoClient("172.17.0.2", 27017)
