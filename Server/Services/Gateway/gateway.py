@@ -106,7 +106,9 @@ class auth_router:
     }
 
     def on_get(self, req, resp):
-        body = req.context["body"]
+        body = req.context.get("body")
+        if not body:
+            raise falcon.HTTPBadRequest(title="Body is empty")
 
         if (body.get("email") is None or body.get("password") is None):
             raise falcon.HTTPNotAcceptable(description="email or password is missing on body")
@@ -125,7 +127,9 @@ class sign_handler:
     }
 
     def on_get(self, req, resp):
-        body = req.context["body"]
+        body = req.context.get("body")
+        if not body:
+            raise falcon.HTTPBadRequest(title="Body is empty")
 
         if body.get("email") is None or body.get("password") is None or body.get("name") is None:
             raise falcon.HTTPNotAcceptable(description="email, password or name is missing on body")
@@ -150,7 +154,9 @@ class try_token_handler:
 
 class assign_router:
     def on_get(self, req, resp):
-        body = req.context["body"]
+        body = req.context.get("body")
+        if not body:
+            raise falcon.HTTPBadRequest(title="Body is empty")
 
         assign_as = req.params.get("assign_as")
 
@@ -186,7 +192,9 @@ class assign_router:
 
 class create_router:
     def on_get(self, req, resp):
-        body = req.context["body"]
+        body = req.context.get("body")
+        if not body:
+            raise falcon.HTTPBadRequest(title="Body is empty")
 
         admin_ops = ["university", "department", "faculty", "course"]
         inst_ops = ["section", "exam"]
@@ -291,7 +299,9 @@ class upload_router:
 
 class update_router:
     def on_get(self, req, resp):
-        body = req.context["body"]
+        body = req.context.get("body")
+        if not body:
+            raise falcon.HTTPBadRequest(title="Body is empty")
 
         ops = ["section", "exam"]
 
