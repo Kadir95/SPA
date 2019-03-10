@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import jwt
+from response_builder import std_response
 
 secret = "tikitikitemponeserambocaribururucineserambo"
 
@@ -11,17 +12,8 @@ def verify_token(token):
             "payload": payload
         }
     except jwt.ExpiredSignatureError as err:
-        return {
-            "success": False,
-            "message": "expired token"
-        }
+        return std_response(False, message="expired token")
     except jwt.DecodeError as err:
-        return {
-            "success": False,
-            "message": "decode error"
-        }
+        return std_response(False, message="decode error")
     # easter egg :)
-    return {
-        "success": False,
-        "message": "python failed successfully!"
-    }
+    return std_response(False, message="python failed successfully!")

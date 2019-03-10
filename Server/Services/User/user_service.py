@@ -13,8 +13,6 @@ from response_builder import std_response
 from token_operations import secret
 import db_operations
 
-conn = connect_db()
-
 class User_service(rpyc.Service):
     def exposed_assign_handler(self, data):
         db_conn = connect_db()
@@ -25,49 +23,37 @@ class User_service(rpyc.Service):
         user_id = user_id[0] if user_id and len(user_id) > 0 else None
 
         if user_id is None:
-            return json.dumps(std_response(False, "There is no user who has <%s> email" %(data["email"])))
+            return std_response(False, "There is no user who has <%s> email" %(data["email"]))
 
         if data["op"] == "instructor":
             try:
                 cur.execute("INSERT INTO public.instructors(instructor_id, id_people, department_id_departments) VALUES (%s, %s, %s);", [user_id, user_id, data["department_id"]])
                 db_conn.commit()
                 cur.close()
-                return json.dumps(std_response(True, "User becomes instructor"))
+                return std_response(True, "User becomes instructor")
             except Exception as err:
                 print(err)
-                return json.dumps({
-                    "success": False,
-                    "message": "Task failed"
-                })
+                return std_response(False, message="Task failed")
         elif data["op"] == "student":
             try:
                 cur.execute("INSERT INTO public.students(student_id, id_people, department_id_departments) VALUES (%s, %s, %s);", [user_id, user_id, data["department_id"]])
                 db_conn.commit()
                 cur.close()
-                return json.dumps(std_response(True, "User becomes student"))
+                return std_response(True, "User becomes student")
             except Exception as err:
                 print(err)
-                return json.dumps({
-                    "success": False,
-                    "message": "Task failed"
-                })
+                return std_response(False, message="Task failed")
         elif data["op"] == "admin":
             try:
                 cur.execute("INSERT INTO public.admins(admin_id, id_people)VALUES (%s, %s);", [user_id, user_id])
                 db_conn.commit()
                 cur.close()
-                return json.dumps(std_response(True, "User becomes admin"))
+                return std_response(True, "User becomes admin")
             except Exception as err:
                 print(err)
-                return json.dumps({
-                    "success": False,
-                    "message": "Task failed"
-                })
+                return std_response(False, message="Task failed")
         else:
-            return json.dumps({
-                "success": False,
-                "message": "Operation doesn't match"
-            })
+            return std_response(False, message="Operation doesn't match")
     
     def exposed_create_handler(self, data):
         db_conn = connect_db()
@@ -82,10 +68,10 @@ class User_service(rpyc.Service):
                 cur.executemany("INSERT INTO public.many_exam_has_many_sections(exam_id_exam, section_id_sections) VALUES (%s, %s);", values)
                 db_conn.commit()
                 cur.close()
-                return json.dumps(std_response(True, "Exam added successfully"))
+                return std_response(True, "Exam added successfully")
             except Exception as err:
                 print(err)
-                return json.dumps(std_response(False, "Task failed"))
+                return std_response(False, "Task failed")
         
         elif data["op"] == "section":
             try:
@@ -93,10 +79,10 @@ class User_service(rpyc.Service):
                 [data["section_code"], data["course_id"], data["instructor_id"]])
                 db_conn.commit()
                 cur.close()
-                return json.dumps(std_response(True, "Section added successfully"))
+                return std_response(True, "Section added successfully")
             except Exception as err:
                 print(err)
-                return json.dumps(std_response(False, "Task failed"))
+                return std_response(False, "Task failed")
         
         elif data["op"] == "course":
             try:
@@ -104,10 +90,10 @@ class User_service(rpyc.Service):
                 [data["name"], data["course_code"], data["department_id"]])
                 db_conn.commit()
                 cur.close()
-                return json.dumps(std_response(True, "Course added successfully"))
+                return std_response(True, "Course added successfully")
             except Exception as err:
                 print(err)
-                return json.dumps(std_response(False, "Task failed"))
+                return std_response(False, "Task failed")
         
         elif data["op"] == "faculty":
             try:
@@ -115,10 +101,10 @@ class User_service(rpyc.Service):
                 [data["name"], data["university_id"]])
                 db_conn.commit()
                 cur.close()
-                return json.dumps(std_response(True, "Faculty added successfully"))
+                return std_response(True, "Faculty added successfully")
             except Exception as err:
                 print(err)
-                return json.dumps(std_response(False, "Task failed"))
+                return std_response(False, "Task failed")
         
         elif data["op"] == "department":
             try:
@@ -126,10 +112,10 @@ class User_service(rpyc.Service):
                 [data["name"], data["faculty_id"]])
                 db_conn.commit()
                 cur.close()
-                return json.dumps(std_response(True, "Department added successfully"))
+                return std_response(True, "Department added successfully")
             except Exception as err:
                 print(err)
-                return json.dumps(std_response(False, "Task failed"))
+                return std_response(False, "Task failed")
         
         elif data["op"] == "university":
             try:
@@ -137,20 +123,20 @@ class User_service(rpyc.Service):
                 [data["name"], data["s_name"]])
                 db_conn.commit()
                 cur.close()
-                return json.dumps(std_response(True, "University added successfully"))
+                return std_response(True, "University added successfully")
             except Exception as err:
                 print(err)
-                return json.dumps(std_response(False, "Task failed"))
-        
+                return std_response(False, "Task failed")
         else:
-            return json.dumps(std_response(False, message="Operation doesn't match"))
-
-
-        
+            return std_response(False, message="Operation doesn't match")
 
 port = services["user_service"]
 rypc_server = ThreadedServer(
     User_service,
-    port=port
+    port=port,
+    protocol_config={
+        'allow_public_attrs': True,
+        "allow_pickle": True
+        }
     )
 rypc_server.start()

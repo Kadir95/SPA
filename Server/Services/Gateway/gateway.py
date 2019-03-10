@@ -4,13 +4,67 @@ import json
 import sys
 import os
 import uuid
+import pickle
+
+import umsgpack as mp
+
+from falcon_cors import CORS
 
 sys.path.append("../../Lib")
 from connections import connect_rpc, services
 from token_operations import verify_token
 from response_builder import std_response
+from auth_operations import take_user_type
 
 data_path = "/home/mzp7/workspace/MEF/SPA/Server/data"
+
+cors = CORS(allow_all_origins=True)
+
+# Later
+class MessagePack_Translator(object):
+    def process_request(self, req, resp):
+        if req.content_length in (None, 0):
+            return
+        
+        body = req.stream.read()
+
+        if not body:
+            raise falcon.HTTPBadRequest(title="Empty request body", description="A valid MessagePack document is required")
+        
+        try:
+            req.context["body"] = mp.loads(body)
+        except Exception as err:
+            raise falcon.HTTPBadRequest(title="Malformed MassagePack", description="Could not decode request body")
+    
+    def process_response(self, req, resp, resource):
+        if not resp.context["result"]:
+            return
+        
+        resp.body = mp.dumps(resp.context["result"])
+
+class JSON_Translator(object):
+    def process_request(self, req, resp):
+        if req.content_length in (None, 0):
+            return
+        
+        body = req.stream.read()
+
+        if not body:
+            raise falcon.HTTPBadRequest(title="Empty request body", description="A valid MessagePack document is required")
+        
+        try:
+            req.context["body"] = json.loads(body)
+        except Exception as err:
+            raise falcon.HTTPBadRequest(title="Malformed MassagePack", description="Could not decode request body")
+    
+    def process_response(self, req, resp, resource):
+        if not resp.context.get("result"):
+            return
+
+        # Find a good way to do that (plz)
+        resp.context["result"] = pickle.loads(pickle.dumps(resp.context["result"]))
+
+        resp.body = json.dumps(resp.context["result"])
 
 class AuthMiddleware(object):
     def __init__(self, exempt_routes=None, exempt_methods=None):
@@ -52,19 +106,18 @@ class auth_router:
     }
 
     def on_get(self, req, resp):
-        if (req.get_header("email") is None or req.get_header("password") is None):
-            resp.media = {
-                "success": False,
-                "message": "There is no value about email or password"
-            }
+        body = req.context["body"]
+
+        if (body.get("email") is None or body.get("password") is None):
+            raise falcon.HTTPNotAcceptable(description="email or password is missing on body")
         else:
             data = {
-                "email": req.get_header("email"),
-                "password": req.get_header("password")
+                "email": body.get("email"),
+                "password": body.get("password")
             }
             conn = connect_rpc()
             response = conn.root.get_token(data)
-            resp.media = json.loads(response)
+            resp.context["result"] = response
 
 class sign_handler:
     auth = {
@@ -72,87 +125,69 @@ class sign_handler:
     }
 
     def on_get(self, req, resp):
-        if req.get_header("email") is None or req.get_header("password") is None or req.get_header("name") is None:
-            resp.media = {
-                "success": False,
-                "message": "Not enough argument. email, password and name are must"
-            }
+        body = req.context["body"]
+
+        if body.get("email") is None or body.get("password") is None or body.get("name") is None:
+            raise falcon.HTTPNotAcceptable(description="email, password or name is missing on body")
         else:
             conn = connect_rpc()
             data = {
-                "email": req.get_header("email"),
-                "name": req.get_header("name"),
-                "lastname": req.get_header("lastname"),
-                "password": req.get_header("password"),
-                "school_no": req.get_header("school_no")
+                "email": body.get("email"),
+                "name": body.get("name"),
+                "lastname": body.get("lastname"),
+                "password": body.get("password"),
+                "school_no": body.get("school_no")
             }
 
             response = conn.root.add_new_user(data)
-            resp.media = json.loads(response)
+            resp.context["result"] = response
 
 class try_token_handler:
     def on_get(self, req, resp):
         conn = connect_rpc()
         response = conn.root.verify_token(req.get_header("token"))
-        resp.media = json.loads(response)
+        resp.context["result"] = response
 
 class assign_router:
     def on_get(self, req, resp):
+        body = req.context["body"]
+
         assign_as = req.params.get("assign_as")
 
-        auth_service = connect_rpc()
-        user_type = auth_service.root.user_type(req.context["user"]["email"])
+        user_type = take_user_type(req.context["user"]["email"])
 
         if user_type is None:
-            resp.media = {
-                "success": False,
-                "message": "No user"
-            }
-            return
+            raise falcon.HTTPBadRequest(title="No user", description="There is no user on system to execute assign process on it")
         
         if user_type != "admin_user":
-            resp.media = {
-                "success": False,
-                "message": "Unauthorized user"
-            }
-            return
+            raise falcon.HTTPUnauthorized(title="Unauthorized user")
 
         op = ["instructor", "student", "admin"]
 
         if assign_as not in op:
-            resp.media = {
-                "success": False,
-                "message": "assign as parameter could be %s" %(op)
-            }
-            return
+            raise falcon.HTTPBadRequest(title="Unsupported operation")
 
-        if req.get_header("email") is None:
-            resp.media = {
-                "success": False,
-                "message": "email is needed"
-            }
-            return
+        if body.get("email") is None:
+            raise falcon.HTTPBadRequest(title="Email is needed")
 
         if assign_as == "instructor" or assign_as == "student":
-            if req.get_header("department_id") is None:
-                resp.media = {
-                    "success": False,
-                    "message": "department_id is needed"
-                }
-                return
+            if body.get("department_id") is None:
+                raise falcon.HTTPBadRequest(title="Department_id is needed")
 
         data = {
             "op": assign_as,
-            "email": req.get_header("email"),
-            "department_id": req.get_header("department_id")
+            "email": body.get("email"),
+            "department_id": body.get("department_id")
         }
 
         user_service = connect_rpc(service=services["user_service"])
         response = user_service.root.assign_handler(data)
-        resp.media = json.loads(response)
+        resp.context["result"] = response
 
 class create_router:
     def on_get(self, req, resp):
+        body = req.context["body"]
+
         admin_ops = ["university", "department", "faculty", "course"]
         inst_ops = ["section", "exam"]
 
@@ -167,43 +202,39 @@ class create_router:
 
         op = req.params.get("new")
 
-        auth_service = connect_rpc()
-        user_type = auth_service.root.user_type(req.context["user"]["email"])
+        user_type = take_user_type(req.contex["user"]["email"])
+
+        if not op:
+            raise falcon.HTTPBadRequest(title="There is no 'change' params")
 
         if user_type is None:
-            resp.media = std_response(False, message="No user")
-            return
+            raise falcon.HTTPBadRequest(title="No user")
         
         if op not in admin_ops + inst_ops:
-            resp.media = std_response(False, message="Unsupported operation")
-            return
+            raise falcon.HTTPBadRequest(title="Unsupported operation")
         
         if op in admin_ops and user_type != "admin_user":
-            resp.media = std_response(False, message="Unauthorized user")
-            return
+            raise falcon.HTTPBadRequest(title="Unauthorized user")
 
         if op in inst_ops and user_type != "instructor_user" and user_type != "admin_user":
-            resp.media = std_response(False, message="Unauthorized user")
-            return
+            raise falcon.HTTPBadRequest(title="Unauthorized user")
         
         data = {
             "op": op
         }
 
         for needed_arg in needed_args[op]:
-            if req.get_header(needed_arg) is None:
-                resp.media = std_response(False, message="Insufficient arguments")
-                return
-            data[needed_arg] = req.get_header(needed_arg)
+            if body.get(needed_arg) is None:
+                raise falcon.HTTPBadRequest(title="Insufficient arguments")
+            data[needed_arg] = body.get(needed_arg)
 
         user_service = connect_rpc(service=services["user_service"])
         response = user_service.root.create_handler(data)
-        resp.media = json.loads(response)
+        resp.context["result"] = response
 
 class upload_router:
     def on_post(self, req, resp):
-        auth_service = connect_rpc()
-        user_type = auth_service.root.user_type(req.context["user"]["email"])
+        user_type = take_user_type(req.contex["user"]["email"])
 
         if user_type is None:
             resp.media = std_response(False, message="No user")
@@ -238,8 +269,7 @@ class upload_router:
         resp.media = std_response(True, message="File transferred successfully")
     
     def on_get(self, req, resp):
-        auth_service = connect_rpc()
-        user_type = auth_service.root.user_type(req.context["user"]["email"])
+        user_type = take_user_type(req.contex["user"]["email"])
 
         if user_type is None:
             resp.media = std_response(False, message="No user")
@@ -259,10 +289,72 @@ class upload_router:
         resp.downloadable_as = 'attachment; filename="report.zip"'
         resp.stream = open(os.path.join(data_path, exam_uuid, "result.zip"), "rb")
 
-api = falcon.API(middleware=[AuthMiddleware()])
+class update_router:
+    def on_get(self, req, resp):
+        body = req.context["body"]
+
+        ops = ["section", "exam"]
+
+        needed_args = {
+            "section": ["section_id", ["instructor_id", "section_code", "course_id"]],
+            "exam": ["exam_id", ["type"]]
+        }
+
+        user_type = take_user_type(req.context["user"]["email"])
+
+        if user_type not in ["admin_user", "instructor_user"]:
+            raise falcon.HTTPBadRequest(title="No user")
+
+        op = req.params.get("change") or False
+
+        if not op:
+            raise falcon.HTTPBadRequest(title="There is no 'change' params")
+
+        if op not in ops:
+            raise falcon.HTTPBadRequest(title="Unsupported operation")
+
+        data = {
+            "op": op
+        }
+
+        for arg in needed_args[op]:
+            if isinstance(arg, list):
+                count = 0
+                for nested_arg in arg:
+                    if body.get(nested_arg):
+                        data[nested_arg] = body.get(nested_arg)
+                        count += 1
+                if count != 1:
+                    if count == 0:
+                        raise falcon.HTTPBadRequest(title="Insufficient arguments")
+                    else:
+                        raise falcon.HTTPBadRequest(title="Too many arguments")
+            else:
+                if not body.get(arg):
+                    raise falcon.HTTPBadRequest(title="Insufficient arguments")
+                data[arg] = body.get(arg)
+        
+        database_service = connect_rpc(service=services["database_service"])
+        response = database_service.root.update_handler(data)
+        resp.context["result"] = response
+
+class list_router:
+    def on_get(self, req, resp):
+        resp.context["result"] = req.context["body"]["message"]
+
+api = falcon.API(
+    middleware=[
+        AuthMiddleware(),
+        JSON_Translator(),
+        cors.middleware
+        ]
+    )
+
 api.add_route("/api/assign", assign_router())
 api.add_route("/api/create", create_router())
 api.add_route("/api/upload", upload_router())
+api.add_route("/api/list", list_router())
+api.add_route("/api/update", update_router())
 
 api.add_route("/api/auth", auth_router())
 api.add_route("/api/sign_in", sign_handler())

@@ -10,6 +10,8 @@ from rpyc.utils.server import ThreadedServer
 sys.path.append("../../Lib")
 from connections import connect_rpc, services, connect_db
 from token_operations import verify_token, secret
+from auth_operations import user_types
+from response_builder import std_response
 
 conn = connect_db()
 
@@ -35,18 +37,12 @@ class Auth_service(rpyc.Service):
         except Exception as e:
             conn.rollback()
             cur.close()
-            return json.dumps({
-                "success": False,
-                "message": "An error occur on operation (Task failed successfully)",
-            })
+            return std_response(False, message="An error occur on operation")
         
         conn.commit()
         cur.close()
 
-        return json.dumps({
-            "success": True,
-            "message": "new user added successfully"
-        })
+        return std_response(True, message="new user added successfully")
         
     def exposed_get_token(self, data):
         cur = conn.cursor()
@@ -65,10 +61,7 @@ class Auth_service(rpyc.Service):
             response.append(row)
 
         if len(response) == 0:
-            return json.dumps({
-                "success": False,
-                "message": "Wrong email or password"
-            })
+            return std_response(False, message="Wrong email or password")
 
         response = response[0]
 
@@ -82,11 +75,11 @@ class Auth_service(rpyc.Service):
             "expire_time": 2
         }, secret, algorithm="HS256")
 
-        return json.dumps({
+        return {
             "success": True,
             "token_type": "jwt",
             "token": token.decode()
-        })
+        }
 
     def exposed_user_type(self, email):
         if email is not None:
@@ -108,22 +101,26 @@ class Auth_service(rpyc.Service):
             response = response[0]
 
             if response[1] is not None:
-                return "admin_user"
+                return user_types[0]
             elif response[2] is not None:
-                return "instructor_user"
+                return user_types[1]
             elif response[3] is not None:
-                return "student_user"
+                return user_types[2]
             else:
-                return "normal_user"
+                return user_types[3]
         else: 
             return None
         
     def exposed_verify_token(self, token):
-        return json.dumps(verify_token(token))
+        return verify_token(token)
 
 port = services["auth_service"]
 rypc_server = ThreadedServer(
     Auth_service,
-    port=port
+    port=port,
+    protocol_config={
+        'allow_public_attrs': True,
+        "allow_pickle": True
+        }
     )
 rypc_server.start()

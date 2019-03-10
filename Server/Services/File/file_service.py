@@ -12,8 +12,6 @@ from token_operations import verify_token, secret
 from pdf_split import pdf_qrcode_reader, zip_results
 from db_operations import get_exam_uuid
 
-conn = connect_db()
-
 class File_service(rpyc.Service):
     def exposed_exam_file(self, data):
         db_conn = connect_db()
@@ -39,6 +37,10 @@ class File_service(rpyc.Service):
 port = services["file_service"]
 rypc_server = ThreadedServer(
     File_service,
-    port=port
+    port=port,
+    protocol_config={
+        'allow_public_attrs': True,
+        "allow_pickle": True
+        }
     )
 rypc_server.start()
