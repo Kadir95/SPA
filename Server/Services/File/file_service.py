@@ -9,7 +9,7 @@ from rpyc.utils.server import ThreadedServer
 sys.path.append("../../Lib")
 from connections import connect_rpc, services, connect_db
 from token_operations import verify_token, secret
-from pdf_split import pdf_qrcode_reader, zip_results
+from pdf_split import pdf_qrcode_reader, zip_results, is_zip_done
 from db_operations import get_exam_uuid
 
 class File_service(rpyc.Service):
@@ -29,6 +29,8 @@ class File_service(rpyc.Service):
     
     def exposed_split_file(self, exam_id):
         exam_uuid = get_exam_uuid(exam_id)
+        if is_zip_done(exam_uuid):
+            return exam_uuid
         pdf_qrcode_reader(exam_uuid)
         zip_results(exam_uuid)
         return exam_uuid

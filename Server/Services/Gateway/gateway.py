@@ -51,12 +51,12 @@ class JSON_Translator(object):
         body = req.stream.read()
 
         if not body:
-            raise falcon.HTTPBadRequest(title="Empty request body", description="A valid MessagePack document is required")
+            raise falcon.HTTPBadRequest(title="Empty request body", description="A valid JSON document is required")
         
         try:
             req.context["body"] = json.loads(body)
         except Exception as err:
-            raise falcon.HTTPBadRequest(title="Malformed MassagePack", description="Could not decode request body")
+            raise falcon.HTTPBadRequest(title="Malformed JSON", description="Could not decode request body")
     
     def process_response(self, req, resp, resource):
         if not resp.context.get("result"):
@@ -75,15 +75,15 @@ class BSON_Translator(object):
         body = req.stream.read()
 
         if not body:
-            raise falcon.HTTPBadRequest(title="Empty request body", description="A valid MessagePack document is required")
-        
+            raise falcon.HTTPBadRequest(title="Empty request body", description="A valid BSON or JSON document is required")
+
         try:
             req.context["body"] = bson.loads(body)
         except Exception as err:
             try:
                 req.context["body"] = json.loads(body)
             except Exception as err:
-                raise falcon.HTTPBadRequest(title="Malformed MassagePack", description="Could not decode request body %s" %(err))
+                raise falcon.HTTPBadRequest(title="Malformed BSON or JSON", description="Could not decode request body %s" %(err))
     
     def process_response(self, req, resp, resource):
         if not resp.context.get("result"):
@@ -139,7 +139,7 @@ class auth_router:
             raise falcon.HTTPBadRequest(title="Body is empty")
 
         if (body.get("email") is None or body.get("password") is None):
-            raise falcon.HTTPNotAcceptable(description="email or password is missing on body")
+            raise falcon.HTTPBadRequest(title="email or password is missing on body")
         else:
             data = {
                 "email": body.get("email"),
@@ -238,7 +238,7 @@ class create_router:
 
         op = req.params.get("new")
 
-        user_type = take_user_type(req.contex["user"]["email"])
+        user_type = take_user_type(req.context["user"]["email"])
 
         if not op:
             raise falcon.HTTPBadRequest(title="There is no 'change' params")
@@ -311,25 +311,29 @@ class upload_router:
         resp.context["result"] = std_response(True, message="File transferred successfully")
     
     def on_get(self, req, resp):
-        user_type = take_user_type(req.contex["user"]["email"])
+        body = req.context.get("body")
+        if not body:
+            raise falcon.HTTPBadRequest(title="Body is empty")
+
+        user_type = take_user_type(req.context["user"]["email"])
 
         if user_type is None:
-            resp.media = std_response(False, message="No user")
-            return
+            raise falcon.HTTPBadRequest(title="No user")
         
-        if user_type != "instructor_user":
-            resp.media = std_response(False, message="Unauthorized user")
-            return
+        if user_type not in [user_types[1], user_types[0]]:
+            raise falcon.HTTPBadRequest(title="Unauthorized user")
 
-        if req.get_header("exam_id") is None:
-            resp.media = std_response(False, message="There is no exam_id")
-            return
+        if body.get("exam_id") is None:
+            raise falcon.HTTPBadRequest(title="There is no exam_id key")
         
         file_service = connect_rpc(service=services["file_service"])
-        exam_uuid = file_service.root.split_file(req.get_header("exam_id"))
+        exam_uuid = file_service.root.split_file(body.get("exam_id"))
 
-        resp.downloadable_as = 'attachment; filename="report.zip"'
-        resp.stream = open(os.path.join(data_path, exam_uuid, "result.zip"), "rb")
+        resp_data = {
+            "zip_file": open(os.path.join(data_path, exam_uuid, "result.zip"), "rb").read()
+        }
+        
+        resp.context["result"] = resp_data
 
 class update_router:
     def on_get(self, req, resp):
