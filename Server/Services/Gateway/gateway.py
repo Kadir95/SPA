@@ -1,6 +1,7 @@
 import falcon
 import rpyc
 import json
+import bson
 import sys
 import os
 import uuid
@@ -14,7 +15,7 @@ sys.path.append("../../Lib")
 from connections import connect_rpc, services
 from token_operations import verify_token
 from response_builder import std_response
-from auth_operations import take_user_type
+from auth_operations import take_user_type, user_types
 
 data_path = "/home/mzp7/workspace/MEF/SPA/Server/data"
 
@@ -65,6 +66,33 @@ class JSON_Translator(object):
         resp.context["result"] = pickle.loads(pickle.dumps(resp.context["result"]))
 
         resp.body = json.dumps(resp.context["result"])
+
+class BSON_Translator(object):
+    def process_request(self, req, resp):
+        if req.content_length in (None, 0):
+            return
+        
+        body = req.stream.read()
+
+        if not body:
+            raise falcon.HTTPBadRequest(title="Empty request body", description="A valid MessagePack document is required")
+        
+        try:
+            req.context["body"] = bson.loads(body)
+        except Exception as err:
+            try:
+                req.context["body"] = json.loads(body)
+            except Exception as err:
+                raise falcon.HTTPBadRequest(title="Malformed MassagePack", description="Could not decode request body %s" %(err))
+    
+    def process_response(self, req, resp, resource):
+        if not resp.context.get("result"):
+            return
+
+        # Find a good way to do that (plz)
+        resp.context["result"] = pickle.loads(pickle.dumps(resp.context["result"]))
+
+        resp.body = bson.dumps(resp.context["result"])
 
 class AuthMiddleware(object):
     def __init__(self, exempt_routes=None, exempt_methods=None):
@@ -242,39 +270,45 @@ class create_router:
 
 class upload_router:
     def on_post(self, req, resp):
-        user_type = take_user_type(req.contex["user"]["email"])
+        body = req.context.get("body")
+        if not body:
+            raise falcon.HTTPBadRequest(title="Body is empty")
+        
+        user_type = take_user_type(req.context["user"]["email"])
 
         if user_type is None:
-            resp.media = std_response(False, message="No user")
-            return
+            raise falcon.HTTPBadRequest(title="No user")
         
-        if user_type != "instructor_user":
-            resp.media = std_response(False, message="Unauthorized user")
-            return
+        if user_type not in [user_types[1], user_types[0]]:
+            raise falcon.HTTPBadRequest(title="Unauthorized user")
 
-        if req.get_header("exam_id") is None:
-            resp.media = std_response(False, message="There is no exam_id")
-            return
+        if body.get("exam_id") is None:
+            raise falcon.HTTPBadRequest(title="There is no exam_id key")
+
+        if body.get("exam_pdf") is None:
+            raise falcon.HTTPBadRequest(title="There is no exam_pdf key")
+
+        if len(body.get("exam_pdf")) == 0:
+            raise falcon.HTTPBadRequest(title="exam_pdf is empty")
 
         data = {
-            "exam_id": req.get_header("exam_id")
+            "exam_id": body.get("exam_id")
         }
 
         file_service = connect_rpc(service=services["file_service"])
         exam_uuid = file_service.root.exam_file(data)
 
         if exam_uuid is None:
-            resp.media = std_response(False, message="Task failed")
-            return
+            raise falcon.HTTPBadRequest(title="Task failed")
 
         file_dir = os.path.join(data_path, str(exam_uuid))
         os.makedirs(file_dir)
         file_dir = os.path.join(file_dir, "original_file")
         file = open(file_dir, "wb")
-        file.write(req.stream.read())
+        file.write(body.get("exam_pdf"))
         file.close()
 
-        resp.media = std_response(True, message="File transferred successfully")
+        resp.context["result"] = std_response(True, message="File transferred successfully")
     
     def on_get(self, req, resp):
         user_type = take_user_type(req.contex["user"]["email"])
@@ -350,12 +384,14 @@ class update_router:
 
 class list_router:
     def on_get(self, req, resp):
-        resp.context["result"] = req.context["body"]["message"]
+        body = req.context.get("body")
+        if not body:
+            raise falcon.HTTPBadRequest(title="Body is empty")
 
 api = falcon.API(
     middleware=[
         AuthMiddleware(),
-        JSON_Translator(),
+        BSON_Translator(),
         cors.middleware
         ]
     )
@@ -363,7 +399,7 @@ api = falcon.API(
 api.add_route("/api/assign", assign_router())
 api.add_route("/api/create", create_router())
 api.add_route("/api/upload", upload_router())
-api.add_route("/api/list", list_router())
+# api.add_route("/api/list", list_router())
 api.add_route("/api/update", update_router())
 
 api.add_route("/api/auth", auth_router())

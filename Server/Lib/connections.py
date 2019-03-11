@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import rpyc
 import psycopg2 as postg
-from pymongo import MongoClient
 
 services = {
     "auth_service": 7878,
