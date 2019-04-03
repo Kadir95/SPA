@@ -1,0 +1,4 @@
+auth_service: 7000
+user_service: 7000
+file_service: 7000
+database_service: 7000

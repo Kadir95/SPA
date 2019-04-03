@@ -2,27 +2,53 @@ import rpyc
 import json
 import jwt
 import sys
+import os
 import datetime
 import psycopg2 as postg
 import hashlib, base64
 from rpyc.utils.server import ThreadedServer
 
-sys.path.append("../../Lib")
+if  os.environ.get("SPACONTAINER"):
+    print(os.environ.get("SPACONTAINER"))
+    sys.path.append("/Server/Lib")
+else:
+    sys.path.append("../../Lib")
+
 from connections import connect_rpc, services, connect_db
 from token_operations import verify_token, secret
 from auth_operations import user_types
 from response_builder import std_response
+from network_tools import get_host_ip
 
-conn = connect_db()
+host = "localhost"
+if os.environ.get("SPACONTAINER"):
+    host = get_host_ip()
+    log_file = open("/log", "w")
+    log_file.write("host ip: %s, port: %d\n" %(host, services["auth_service"]))
+    log_file.flush()
 
 class Auth_service(rpyc.Service):
+    ALIASES = ["auth_service"]
+
     def _take_care_password(self, password, salt):
         hash_password = hashlib.pbkdf2_hmac("sha256", str.encode(password), str.encode(salt), 1024)
         hash_password = base64.encodebytes(hash_password)
         return hash_password.decode().strip()
 
+    def on_connect(self, connection):
+        log_file.write("connection received\n")
+        log_file.flush()
+
+        if not hasattr(self, "db_conn"):
+            self.db_conn = None
+
+        if self.db_conn is None:
+            self.db_conn = connect_db()
+        elif self.db_conn.closed != 0:
+            self.db_conn = connect_db()
+
     def exposed_add_new_user(self, data):
-        cur = conn.cursor()
+        cur = self.db_conn.cursor()
 
         hash_password = self._take_care_password(data["password"], data["email"])
 
@@ -35,17 +61,17 @@ class Auth_service(rpyc.Service):
                 data["email"]
                 ])
         except Exception as e:
-            conn.rollback()
+            self.db_conn.rollback()
             cur.close()
             return std_response(False, message="An error occur on operation")
         
-        conn.commit()
+        self.db_conn.commit()
         cur.close()
 
         return std_response(True, message="new user added successfully")
         
     def exposed_get_token(self, data):
-        cur = conn.cursor()
+        cur = self.db_conn.cursor()
 
         email = data["email"]
         password = data["password"]
@@ -83,7 +109,7 @@ class Auth_service(rpyc.Service):
 
     def exposed_user_type(self, email):
         if email is not None:
-            cur = conn.cursor()
+            cur = self.db_conn.cursor()
             cur.execute("""select P.id, A.admin_id, I.instructor_id, S.student_id from ((
                             (public.people as P left join public.admins as A on P.id = A.admin_id)
                             left join public.instructors as I on P.id = I.instructor_id) 

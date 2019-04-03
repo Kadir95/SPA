@@ -1,0 +1,8 @@
+rpyc
+psycopg2-binary
+PyPDF2
+pdf2image
+opencv-python
+numpy
+pyzbar
+jwt

@@ -9,8 +9,6 @@ import pickle
 
 import umsgpack as mp
 
-from falcon_cors import CORS
-
 sys.path.append("../../Lib")
 from connections import connect_rpc, services
 from token_operations import verify_token
@@ -18,8 +16,6 @@ from response_builder import std_response
 from auth_operations import take_user_type, user_types
 
 data_path = "/home/mzp7/workspace/MEF/SPA/Server/data"
-
-cors = CORS(allow_all_origins=True)
 
 # Later
 class MessagePack_Translator(object):
@@ -71,7 +67,7 @@ class BSON_Translator(object):
     def process_request(self, req, resp):
         if req.content_length in (None, 0):
             return
-        
+
         body = req.stream.read()
 
         if not body:
@@ -133,7 +129,7 @@ class auth_router:
         "auth_disabled": True
     }
 
-    def on_get(self, req, resp):
+    def on_post(self, req, resp):
         body = req.context.get("body")
         if not body:
             raise falcon.HTTPBadRequest(title="Body is empty")
@@ -395,8 +391,7 @@ class list_router:
 api = falcon.API(
     middleware=[
         AuthMiddleware(),
-        BSON_Translator(),
-        cors.middleware
+        BSON_Translator()
         ]
     )
 

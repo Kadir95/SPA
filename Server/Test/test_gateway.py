@@ -3,10 +3,14 @@ import bson
 
 from pprint import pprint
 
+host = "192.168.1.27"
+port = 8000
+base_url = "http://%s:%d" %(host, port)
+
 admin_token = ""
 
 def test_auth():
-    url = "http://10.8.0.2:8000/api/auth"
+    url = base_url + "/api/auth"
 
     payload = {
         "email": "kundakcioglua@mef.edu.tr",
@@ -37,7 +41,7 @@ def test_load():
     pdf_file = open("./data/original_file", "rb")
     pdf = pdf_file.read()
 
-    url = "http://10.8.0.2:8000/api/upload"
+    url = base_url + "/api/upload"
 
     payload = {
         "exam_id": 6,
@@ -63,7 +67,7 @@ def test_load():
         print(bson.loads(response.content))
 
 def test_download():
-    url = "http://10.8.0.2:8000/api/upload"
+    url = base_url + "/api/upload"
 
     payload = {
         "exam_id": 6,
@@ -80,7 +84,7 @@ def test_download():
 
     response = requests.request("GET", url, data=payload, headers=headers)
 
-    print(response, response.text)
+    print(response)
     
     if response.status_code == 200:
         file = open("./data/result.zip", "wb")
